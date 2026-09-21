@@ -1,0 +1,21 @@
+@media (max-width: 600px){
+    .page{
+        padding-bottom: 115vh;     /* 60 vh pane + little gap */
+    }}
+.adm-tabs{ display:flex; gap:8px; margin-bottom:16px; }
+.adm-tabs button{
+  background:#222; color:#fff; border:1px solid #fff; padding:4px 10px; cursor:pointer;
+  font-family:'Press Start 2P', monospace; font-size:10px;
+}
+.adm-tabs button.on{ background:#fff; color:#000; }
+/* desktop: room for the 100-px mini box */
+.page {
+    padding-bottom: 120px;  /* Make sure there’s enough space for the player at the bottom */
+  }
+  
+  /* For mobile devices */
+  @media (max-width: 600px) {
+    .page {
+      padding-bottom: 70vh;  /* enough space for bottom player */
+    }
+  }

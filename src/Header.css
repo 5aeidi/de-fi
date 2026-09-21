@@ -1,0 +1,54 @@
+/* ---------- desktop base ---------- */
+.sor-header{
+    position:fixed; top:0; left:0; right:0; z-index:999;
+    display:flex; align-items:center; gap:1.5rem;
+    height:56px; padding:10px 20px;
+    background:#000; color:#fff;
+    border:1px solid #fff; border-bottom:2px solid #fff; box-shadow:0 1px 0 #fff;
+    font-family:'Press Start 2P', monospace;
+  }
+  
+  .sor-title{ margin:0; font-size:16px; white-space:nowrap; }
+  
+  .sor-nav{
+    display:flex; gap:1rem; margin-left:auto;
+  }
+  .sor-nav a{
+    color:#fff; text-decoration:none;
+  }
+  /* pipes between links */
+  .sor-nav a:not(:last-child)::after{
+    content:"|"; margin-left:1rem; color:#fff;
+  }
+  
+  .sor-burger{ display:none; }        /* hidden on desktop */
+  
+  /* ---------- mobile ≤ 600 px ---------- */
+  @media (max-width:600px){
+    .sor-header{ height:20px; padding:20px 20px; }
+  
+    .sor-title{ font-size:10px; }
+  
+    .sor-burger{
+      display:block; margin-left:auto;
+      background:none; border:none; color:#fff;
+      font-size:20px; cursor:pointer;
+      z-index:1001;                     /* stay above the sliding nav sheet */
+
+    }
+  
+    .sor-nav{
+      position:fixed; top:0px; left:0px; right:0px;
+      background:#000; border:1px solid #fff;
+      flex-direction:column; gap:1px;
+      padding:10px 20px;
+      transform:translateY(-100%);      /* hidden */
+      transition:transform .1s ease-out;
+      z-index:1000;                     /* sheet sits *under* the button */
+    }
+    .sor-nav.open{ transform:translateY(0); }   /* slide in */
+  
+    /* no pipes on mobile */
+    .sor-nav a:not(:last-child)::after{ content:none; }
+  }
+  
