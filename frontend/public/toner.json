@@ -1,0 +1,68 @@
+{
+  "version": 8,
+  "name": "Dark-Mono",
+  "glyphs": "/fonts/vt323/{fontstack}/{range}.pbf",
+  "sources": {
+    "osm": {
+      "type": "vector",
+      "tiles": [
+        "https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf"
+      ],
+      "maxzoom": 14
+    }
+  },
+  "layers": [
+    {
+      "id": "bg",
+      "type": "background",
+      "paint": { "background-color": "#000000" }
+    },
+
+    {
+      "id": "land",
+      "type": "fill",
+      "source": "osm",
+      "source-layer": "landcover",
+      "paint": { "fill-color": "#050505" }
+    },
+    {
+      "id": "water",
+      "type": "fill",
+      "source": "osm",
+      "source-layer": "water",
+      "paint": { "fill-color": "#166017" }
+    },
+
+    {
+      "id": "roads",
+      "type": "line",
+      "source": "osm",
+      "source-layer": "transportation",
+      "paint": { "line-color": "#333", "line-width": 0.7 }
+    },
+
+    {
+      "id": "place-labels",
+      "type": "symbol",
+      "source": "osm",
+      "source-layer": "place",
+      "layout": {
+        "text-field": [
+          "case",
+            ["==", ["get", "name:en"], "Israel"],
+            "Palestine",
+            ["get", "name:en"]              
+        ],
+        "text-font": ["VT323 Regular"],
+        "text-size": 14
+      },
+
+      "paint": {
+        "text-color": "#888",
+        "text-halo-color": "#000",
+        "text-halo-width": 1
+      }
+    }
+
+  ]
+}

@@ -1,0 +1,31 @@
+@media (max-width: 600px){
+    .page{
+        padding-bottom: 115vh;     /* 60 vh pane + little gap */
+    }}
+.adm-tabs{ display:flex; gap:8px; margin-bottom:16px; }
+.adm-tabs button{
+  background:#222; color:#fff; border:1px solid #fff; padding:4px 10px; cursor:pointer;
+  font-family:'Press Start 2P', monospace; font-size:10px;
+}
+.adm-tabs button.on{ background:#fff; color:#000; }
+/* desktop: room for the 100-px mini box */
+.page {
+    padding-bottom: 120px;  /* Make sure there’s enough space for the player at the bottom */
+  }
+  
+  /* For mobile devices */
+  @media (max-width: 600px) {
+    .page {
+      padding-bottom: 70vh;  /* enough space for bottom player */
+    }
+  }
+/* tag picker */
+.tag-chip { display:inline-flex; align-items:center; gap:4px; border:1px solid #fff; padding:0 6px; font-size:12px; }
+.tag-chip button { background:none; border:none; color:#fff; cursor:pointer; padding:0; }
+.tag-dropdown { position:absolute; z-index:20; left:0; right:0; max-height:180px; overflow-y:auto;
+  margin:0; padding:0; list-style:none; background:#000; border:1px solid #fff; }
+.tag-dropdown li { padding:4px 8px; cursor:pointer; }
+.tag-dropdown li:hover { background:#333; }
+.geo-results { list-style:none; margin:4px 0; padding:0; border:1px solid #fff; max-height:180px; overflow-y:auto; }
+.geo-results li { padding:4px 8px; cursor:pointer; font-size:13px; }
+.geo-results li:hover { background:#333; }
