@@ -34,6 +34,10 @@ echo "REACT_APP_MAPTILER_KEY=your_key" > .env.local
 npm start                   # http://localhost:3000
 ```
 
+## Contributing
+
+Issues and pull requests welcome.
+
 ## License
 
 [GNU AGPL v3](LICENSE)
