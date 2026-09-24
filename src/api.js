@@ -91,3 +91,23 @@ export async function saveAbout(html) {
     body: JSON.stringify({ html }),
   });
 }
+
+export async function getTags() {
+  const r = await fetch(`${API_BASE_URL}/tracks/tags`);
+  return r.ok ? r.json() : [];
+}
+
+export async function subscribeNewsletter(email) {
+  const r = await fetch(`${API_BASE_URL}/newsletter/subscribe`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!r.ok) throw new Error("invalid email");
+  return r.json();
+}
+
+export async function getSubscribers() {
+  const r = await authFetch("/newsletter/subscribers");
+  return r.ok ? r.json() : [];
+}

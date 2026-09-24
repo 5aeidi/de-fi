@@ -4,7 +4,7 @@
 // domains in the MapTiler dashboard.
 export const MAP_STYLE = `${process.env.PUBLIC_URL}/toner.json`;
 
-const MAPTILER_KEY = process.env.REACT_APP_MAPTILER_KEY;
+export const MAPTILER_KEY = process.env.REACT_APP_MAPTILER_KEY;
 
 export function transformRequest(url) {
   if (MAPTILER_KEY && url.startsWith("https://api.maptiler.com/")) {

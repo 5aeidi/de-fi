@@ -1,4 +1,5 @@
-import { getLocations, createLocation, uploadTrack, authFetch} from "./api";
+import { getLocations, createLocation, uploadTrack, authFetch, getTags } from "./api";
+import TagInput from "./TagInput";
 import React, { useState, useEffect, useRef } from "react";
 import {
   Map,
@@ -6,8 +7,15 @@ import {
   NavigationControl,
 } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { MAP_STYLE, transformRequest } from "./mapStyle";
+import { MAP_STYLE, transformRequest, MAPTILER_KEY } from "./mapStyle";
 import "./Admin.css";
+
+const LINK_PLATFORMS = [
+  ["bandcamp", "Bandcamp"],
+  ["spotify", "Spotify"],
+  ["soundcloud", "SoundCloud"],
+  ["youtube", "YouTube"],
+];
 export default function TracksPanel({ token }) {
   const [selectedLocationId, setSelectedLocationId] = useState(null);
   const [currentLoc, setCurrentLoc] = useState(null);
@@ -26,6 +34,16 @@ export default function TracksPanel({ token }) {
 
   const [file, setFile] = useState(null);
   const [artFile, setArtFile] = useState(null);   // artwork image (optional)
+  const [tags, setTags] = useState([]);
+  const [links, setLinks] = useState({});         // platform -> url (optional)
+  const [allTags, setAllTags] = useState([]);
+  const [editTags, setEditTags] = useState([]);
+
+  /* location search (MapTiler geocoding) */
+  const mapRef = useRef(null);
+  const [geoQuery, setGeoQuery] = useState("");
+  const [geoResults, setGeoResults] = useState([]);
+  const [locFilter, setLocFilter] = useState("");
   const [editingTrack, setEditingTrack] = useState(null);   // holds track being edited
   const listRef  = useRef(null);   // track list
   const editRef  = useRef(null);   // edit form
@@ -65,11 +83,29 @@ export default function TracksPanel({ token }) {
       if (hoverInfo) form.append("hover_info", hoverInfo);
       if (infoTxt)   form.append("info", infoTxt);
       if (artFile) form.append("image", artFile);
-  
-      await uploadTrack(form);
+      if (tags.length) form.append("tags", JSON.stringify(tags));
+      LINK_PLATFORMS.forEach(([p]) => {
+        if (links[p]?.trim()) form.append(p, links[p].trim());
+      });
+
+      let res;
+      try {
+        res = await uploadTrack(form);
+      } catch (e) {
+        return alert(e.message);
+      }
+      /* show the new track in the list without a reload */
+      setLocations((prev) =>
+        prev.map((l) =>
+          l.id === selectedLocationId ? { ...l, tracks: [...(l.tracks || []), res.track] } : l
+        )
+      );
+      getTags().then(setAllTags);
       setTrackTitle("");
       setHoverInfo("");
       setFile(null);
+      setTags([]);
+      setLinks({});
       alert("Uploaded");
     };
   
@@ -102,6 +138,40 @@ useEffect(() => {
       editRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [editingTrack]);
+useEffect(() => { getTags().then(setAllTags); }, []);
+
+/* debounced place search */
+useEffect(() => {
+  const q = geoQuery.trim();
+  if (q.length < 2 || !MAPTILER_KEY) { setGeoResults([]); return; }
+  const ctrl = new AbortController();
+  const t = setTimeout(async () => {
+    try {
+      const r = await fetch(
+        `https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json?key=${MAPTILER_KEY}&limit=8`,
+        { signal: ctrl.signal }
+      );
+      const data = await r.json();
+      setGeoResults(data.features || []);
+    } catch {}
+  }, 400);
+  return () => { clearTimeout(t); ctrl.abort(); };
+}, [geoQuery]);
+
+const pickPlace = (f) => {
+  const [lng, lat] = f.center;
+  setLocName(f.text || f.place_name);
+  setCreateLat(lat.toFixed(6));
+  setCreateLng(lng.toFixed(6));
+  setGeoResults([]);
+  setGeoQuery(f.place_name);
+  mapRef.current?.flyTo({ center: [lng, lat], zoom: 9 });
+};
+
+useEffect(() => {
+  if (editingTrack) setEditTags(editingTrack.tags || []);
+}, [editingTrack]);
+
 useEffect(() => {
   (async () => {
     const data = await getLocations();
@@ -144,10 +214,27 @@ useEffect(() => {
           <button onClick={handleCreateLocation}>Create</button>
         </div>
 
+        <div style={{ marginTop: 8 }}>
+          <input
+            placeholder="Search a city or place (e.g. Tehran)"
+            value={geoQuery}
+            onChange={(e) => setGeoQuery(e.target.value)}
+            style={{ width: "100%", boxSizing: "border-box" }}
+          />
+          {geoResults.length > 0 && (
+            <ul className="geo-results">
+              {geoResults.map((f) => (
+                <li key={f.id} onClick={() => pickPlace(f)}>{f.place_name}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         <p style={{ fontSize: 14, marginTop: 8 }}>Or click on the map:</p>
 
         {/* Same MapLibre map as MapPage, but shorter height */}
         <Map
+          ref={mapRef}
           initialViewState={{ latitude: 0, longitude: 0, zoom: 1.5 }}
           style={{ height: 240, width: "100%", border: "1px solid #fff" }}
           mapStyle={MAP_STYLE}
@@ -158,6 +245,11 @@ useEffect(() => {
         >
           <NavigationControl position={isMobile ? "bottom-left" : "top-left"} />
 
+          {createLat && createLng && !isNaN(+createLat) && !isNaN(+createLng) && (
+            <Marker latitude={+createLat} longitude={+createLng} anchor="center">
+              <div style={{ width: 10, height: 10, border: "2px solid #0ff", boxSizing: "border-box" }} />
+            </Marker>
+          )}
           {locations.map((loc) => (
             <Marker
                 key={loc.id}
@@ -258,6 +350,12 @@ useEffect(() => {
   <legend>Upload track</legend>
 
   {/* Location dropdown */}
+  <input
+    placeholder="Filter locations…"
+    value={locFilter}
+    onChange={(e) => setLocFilter(e.target.value)}
+    style={{ marginBottom: 4 }}
+  />
   <label style={{ display: "block", marginBottom: 8 }}>
     Location:&nbsp;
     <select
@@ -265,7 +363,9 @@ useEffect(() => {
       onChange={(e) => setSelectedLocationId(e.target.value)}
     >
       <option value="">choose a location</option>
-      {locations.map((l) => (
+      {locations
+        .filter((l) => l.id === selectedLocationId || l.name.toLowerCase().includes(locFilter.trim().toLowerCase()))
+        .map((l) => (
         <option key={l.id} value={l.id}>
           {l.name} ({l.latitude.toFixed(2)}, {l.longitude.toFixed(2)})
         </option>
@@ -321,6 +421,24 @@ useEffect(() => {
         disabled={!selectedLocationId}
       />
     </label>
+
+    <label>
+      Tags:<br />
+      <TagInput value={tags} onChange={setTags} allTags={allTags} disabled={!selectedLocationId} />
+    </label>
+
+    {LINK_PLATFORMS.map(([p, label]) => (
+      <label key={p}>
+        {label} link (optional):<br />
+        <input
+          type="url"
+          placeholder="https://…"
+          value={links[p] || ""}
+          onChange={(e) => setLinks((prev) => ({ ...prev, [p]: e.target.value }))}
+          disabled={!selectedLocationId}
+        />
+      </label>
+    ))}
 
     {/* MP3 upload */}
     <label>
@@ -388,6 +506,24 @@ useEffect(() => {
       defaultValue={editingTrack.info || ""}
     /><br />
 
+    {/* tags */}
+    <div style={{ margin: "6px 0" }}>
+      Tags:
+      <TagInput value={editTags} onChange={setEditTags} allTags={allTags} />
+    </div>
+
+    {/* streaming links: clear a field to remove that link */}
+    {LINK_PLATFORMS.map(([p, label]) => (
+      <React.Fragment key={p}>
+        <input
+          id={`edt-link-${p}`}
+          type="url"
+          placeholder={`${label} link (optional)`}
+          defaultValue={editingTrack.links?.[p] || ""}
+        /><br />
+      </React.Fragment>
+    ))}
+
     {/* replace files */}
     <label>
       Replace audio (optional):
@@ -416,6 +552,18 @@ useEffect(() => {
         if (hoverVal  !== (editingTrack.hover_info || "")) form.append("hover_info", hoverVal);
         if (infoVal   !== (editingTrack.info || ""))       form.append("info",       infoVal);
 
+        const oldTags = editingTrack.tags || [];
+        const tagsChanged = JSON.stringify(editTags) !== JSON.stringify(oldTags);
+        if (tagsChanged) form.append("tags", JSON.stringify(editTags));
+        const newLinks = { ...(editingTrack.links || {}) };
+        LINK_PLATFORMS.forEach(([p]) => {
+          const v = document.getElementById(`edt-link-${p}`).value.trim();
+          if (v !== (editingTrack.links?.[p] || "")) {
+            form.append(p, v);
+            if (v) newLinks[p] = v; else delete newLinks[p];
+          }
+        });
+
         /* optional new files */
         const audFile = document.getElementById("edt-audio").files[0];
         const imgFile = document.getElementById("edt-img").files[0];
@@ -423,10 +571,15 @@ useEffect(() => {
         if (imgFile) form.append("image", imgFile);
         console.log('FORM: ', form);
         /* send PUT */
-        await authFetch(
+        const res = await authFetch(
           `/tracks/locations/${selectedLocationId}/track/${editingTrack.track_id}`,
           { method: "PUT", body: form }
         );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return alert(err.detail || `Save failed (${res.status})`);
+        }
+        if (tagsChanged) getTags().then(setAllTags);
         {currentLoc && (
             <p style={{ marginTop:4, fontSize:12 }}>
               Selected: {currentLoc.name} ({currentLoc.latitude.toFixed(2)}, {currentLoc.longitude.toFixed(2)})
@@ -448,6 +601,8 @@ useEffect(() => {
                           year:       yearVal,
                           hover_info: hoverVal || null,
                           info:       infoVal   || null,
+                          tags:       editTags,
+                          links:      newLinks,
                         }
                       : tr
                   ),

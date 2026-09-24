@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useSwipeable } from "react-swipeable";
 import { getLocations, getPosts, API_BASE_URL } from "./api";
+import StreamLinks from "./StreamLinks";
 
 const HEADER_H = 56;               // same as your header height
 const isMobile = window.matchMedia("(max-width:600px)").matches;
@@ -135,6 +136,7 @@ activateTrack = async (trackId) => {
             >
           <strong>{track.title}</strong><br/>
           <small>{track.artist} &middot; {track.year}</small>
+          <StreamLinks links={track.links} size={16} />
           <input type="range" min={0} max={duration||0} value={time} onChange={(e)=>seek(+e.target.value)} style={{ width: "100%", marginTop: 4 }} />
           <small>{fmt(time)} / {fmt(duration)}</small><br/>
           <button onClick={(e)=>{e.stopPropagation();toggle();}} style={{ marginTop:4 }}> {playing?"Pause":"Play"} </button>
@@ -204,6 +206,14 @@ activateTrack = async (trackId) => {
               <button onClick={toggle} style={{ margin:"0 6px" }}>{playing?"Pause":"Play"}</button>
               <button onClick={()=>skip(10)}>+10s</button>
             </div>
+            <StreamLinks links={track.links} />
+            {(track.tags || []).length > 0 && (
+              <div style={{ display:"flex", flexWrap:"wrap", gap:4, margin:"4px 0" }}>
+                {track.tags.map((t) => (
+                  <span key={t} style={{ fontSize:10, border:"1px solid #fff", padding:"0 4px" }}>#{t}</span>
+                ))}
+              </div>
+            )}
             {track.info && <p style={{fontSize:10, marginBottom:12}}>{track.info}</p>}
             {postRefs.length>0 && (
               <div style={{ marginTop:"auto" }}>

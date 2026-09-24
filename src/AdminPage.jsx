@@ -34,6 +34,7 @@ import BlogPanel   from "./BlogPanel";
 import { login }   from "./api";          // helper that POSTs /auth/login
 import "./Admin.css";
 import AboutPanel  from "./AboutPanel";    // <-- Import AboutPanel
+import SubscribersPanel from "./SubscribersPanel";
 
 export default function AdminPage() {
   /* -------- login state -------- */
@@ -82,6 +83,7 @@ export default function AdminPage() {
         <button onClick={() => setTab("tracks")} className={tab==="tracks"?"on":""}>Tracks</button>
         <button onClick={() => setTab("blog")}   className={tab==="blog"  ?"on":""}>Blog</button>
         <button onClick={()=>setTab("about")}  className={tab==="about" ?"on":""}>About</button>
+        <button onClick={()=>setTab("subs")}   className={tab==="subs"  ?"on":""}>Subscribers</button>
 
       </div>
 
@@ -94,6 +96,7 @@ export default function AdminPage() {
       {tab==="tracks" && <TracksPanel token={token} />}
       {tab==="blog"   && <BlogPanel   token={token} />}
       {tab==="about"  && <AboutPanel token={token} />}
+      {tab==="subs"   && <SubscribersPanel />}
 
     </div>
   );

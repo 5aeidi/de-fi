@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import "./Header.css";
+import NewsletterModal from "./NewsletterModal";
 
 export default function Header() {
   const [adm,setAdm] = useState(!!localStorage.getItem("admTok"));
@@ -18,6 +19,7 @@ export default function Header() {
 
   const [open, setOpen] = useState(false);
   const toggle = () => setOpen((o) => !o);
+  const [nl, setNl] = useState(false);
 
   return (
     <header className="sor-header">
@@ -29,7 +31,7 @@ export default function Header() {
         style={{ imageRendering: "pixelated" }}
       />
 
-      <h1 className="sor-title">Sounds&nbsp;Of&nbsp;Resistance</h1>
+      <h1 className="sor-title">DE:FI</h1>
 
       {/* burger — mobile only */}
       <button
@@ -47,8 +49,10 @@ export default function Header() {
         <Link to="/blog"    onClick={() => setOpen(false)}>Blog</Link>
         <Link to="/about">About</Link>
         {adm && <Link to="/admin">Admin</Link>}    {/* only if logged in */}
+        <button className="sor-newsletter" onClick={() => { setNl(true); setOpen(false); }}>Newsletter</button>
 
       </nav>
+      {nl && <NewsletterModal onClose={() => setNl(false)} />}
     </header>
   );
 }
