@@ -51,8 +51,8 @@ export default function AdminPage() {
 
       /* 🔔 notify navbar (and any other tab) immediately */
       window.dispatchEvent(new Event("adminlogin"));
-    } catch {
-      alert("Wrong password");
+    } catch (e) {
+      alert(e.message);
     }
   };
 

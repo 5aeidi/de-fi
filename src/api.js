@@ -31,7 +31,8 @@ export async function login(password){
     headers:{ "Content-Type":"application/json" },
     body: JSON.stringify({ password })
   });
-  if(!r.ok) throw new Error("bad pw");
+  if(r.status === 429) throw new Error("Too many attempts, try again in 15 minutes");
+  if(!r.ok) throw new Error("Wrong password");
   return r.json();          //  { token:"…" }
 }
 export async function authFetch(path, opts = {}) {
@@ -97,12 +98,13 @@ export async function getTags() {
   return r.ok ? r.json() : [];
 }
 
-export async function subscribeNewsletter(email) {
+export async function subscribeNewsletter(email, website = "") {
   const r = await fetch(`${API_BASE_URL}/newsletter/subscribe`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, website }),
   });
+  if (r.status === 429 || r.status === 503) throw new Error("busy");
   if (!r.ok) throw new Error("invalid email");
   return r.json();
 }
