@@ -1,5 +1,5 @@
 # backend/routes/track.py
-import os, uuid, json
+import os, re, uuid, json
 from typing import Optional
 from io import BytesIO
 from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException
@@ -26,8 +26,10 @@ def parse_tags(raw: str) -> list[str]:
     if not isinstance(items, list):
         raise HTTPException(400, "tags must be a list")
     seen, out = set(), []
+    # "#a #b" inside one item is several tags
+    items = [p for t in items for p in (re.split(r"[#\s]+", str(t)) if "#" in str(t) else [str(t)])]
     for t in items:
-        t = str(t).strip().lstrip("#").strip()
+        t = t.strip()
         if t and t.lower() not in seen:
             seen.add(t.lower())
             out.append(t[:50])
