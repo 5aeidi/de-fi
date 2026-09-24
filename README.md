@@ -17,26 +17,9 @@ Live at **[de-fi.media](https://de-fi.media)**.
 - Admin panel: search or click the map to place locations; upload tracks with artwork, tags and links; manage posts
 - Newsletter signup (rate-limited, with a honeypot field)
 
-## Running locally
-
-```bash
-# backend (needs MongoDB)
-cd backend
-python -m venv env && source env/bin/activate
-pip install -r requirements.txt
-cp .env.example .env        # set MONGO_URI and ADMIN_PASSWORD
-python main.py              # http://localhost:8000
-
-# frontend
-cd frontend
-npm install
-echo "REACT_APP_MAPTILER_KEY=your_key" > .env.local
-npm start                   # http://localhost:3000
-```
-
 ## Contributing
 
-Issues and pull requests welcome.
+Issues and pull requests welcome. See [CONTRIBUTING](CONTRIBUTING.md).
 
 ## License
 
