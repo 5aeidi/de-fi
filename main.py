@@ -8,6 +8,8 @@ from routes.track import router as track_router
 from routes.blog import router as blog_router
 from routes.auth import router as auth_router
 from routes.about import router as about_router
+from routes.newsletter import router as newsletter_router
+from db import db
 
 
 
@@ -39,6 +41,12 @@ app.include_router(track_router)
 app.include_router(blog_router)
 app.include_router(auth_router)
 app.include_router(about_router)
+app.include_router(newsletter_router)
+
+@app.on_event("startup")
+async def ensure_indexes():
+    await db.sessions.create_index("token", unique=True)
+    await db.subscribers.create_index("email", unique=True)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

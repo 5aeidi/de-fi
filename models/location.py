@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 class TrackInfo(BaseModel):
     track_id: str
@@ -10,6 +10,8 @@ class TrackInfo(BaseModel):
     info: Optional[str] = None
     file_path: str
     image_path: Optional[str] = None
+    tags: List[str] = []            # optional: absent on older tracks
+    links: Dict[str, str] = {}      # platform -> URL, optional
 
 class LocationModel(BaseModel):
     id: Optional[str] = Field(default='str', alias="_id")
