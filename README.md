@@ -1,10 +1,6 @@
 # DE:FI
 
-**An interactive world map of resistance music:** songs pinned to the places they come from, with a site-wide player, a blog, and an admin CMS.
-
 Live at **[de-fi.media](https://de-fi.media)**.
-
-DE:FI is a map you listen to. Each pin is a place, and each place holds songs connected to it: protest anthems, underground tracks and local voices. Click a pin to start playing and keep exploring while the music continues. Tracks link to Bandcamp, Spotify, SoundCloud and YouTube so you can support the artists, and the blog ties stories to the songs.
 
 ## Structure
 
