@@ -6,9 +6,14 @@ export default function TagInput({ value, onChange, allTags, disabled }) {
   const [open, setOpen] = useState(false);
   const has = (t) => value.some((v) => v.toLowerCase() === t.toLowerCase());
 
+  // "#a #b" or "a, b" become separate tags; a plain "hip hop" stays one tag
   const add = (raw) => {
-    const t = raw.trim().replace(/^#/, "").trim();
-    if (t && !has(t)) onChange([...value, t]);
+    const parts = raw.includes("#") ? raw.split(/[#,\s]+/) : raw.split(",");
+    const next = [...value];
+    parts.map((p) => p.trim()).filter(Boolean).forEach((t) => {
+      if (!next.some((v) => v.toLowerCase() === t.toLowerCase())) next.push(t);
+    });
+    if (next.length !== value.length) onChange(next);
     setText("");
   };
   const remove = (t) => onChange(value.filter((v) => v !== t));
