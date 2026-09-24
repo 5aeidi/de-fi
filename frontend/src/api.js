@@ -83,7 +83,7 @@ export async function deletePost(id) {
 
 // api.js
 export async function getAbout() {
-  const r = await fetch(`${API_BASE_URL}/about`);
+  const r = await fetch(`${API_BASE_URL}/about/`);
   return r.json();
 }
 export async function saveAbout(html) {

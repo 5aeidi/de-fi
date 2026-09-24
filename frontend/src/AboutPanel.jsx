@@ -4,10 +4,13 @@ import { saveAbout, getAbout } from "./api";
 
 export default function AboutPanel({ token }) {
   const [text, setText] = useState("");
+  const [loaded, setLoaded] = useState(false);
 
   // Get the current About content when the component mounts
   useEffect(() => {
-    getAbout().then((data) => setText(data.html));
+    getAbout()
+      .then((data) => { setText(data.html); setLoaded(true); })
+      .catch(() => alert("Could not load the About page. Not saving, to avoid overwriting it."));
   }, []);
 
   // Save the updated About content
@@ -24,7 +27,7 @@ export default function AboutPanel({ token }) {
         onChange={(e) => setText(e.target.value)}
         style={{ width: "100%", height: "200px" }}
       />
-      <button onClick={save} style={{ marginTop: 8 }}>Save</button>
+      <button onClick={save} disabled={!loaded} style={{ marginTop: 8 }}>Save</button>
     </div>
   );
 }
