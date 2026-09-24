@@ -36,6 +36,6 @@ npm start                   # http://localhost:3000
 
 ## License
 
-Copyleft: free software under the [GNU AGPL v3](LICENSE). If you run a modified version as a public service, you must make your source code available to its users.
+[GNU AGPL v3](LICENSE)
 
 Map data © OpenStreetMap contributors, tiles by MapTiler.
