@@ -12,6 +12,14 @@ export default function AboutPage() {
   return (
     <div className="page" style={{ padding: 20, color: "#fff", fontFamily: "inherit" }}>
       <h1>About</h1>
+      <hr style={{ border: 0, borderTop: "1px solid #444", margin: "8px 0" }} />
+      <p style={{ fontSize: "0.85em", opacity: 0.7, margin: "0 0 16px" }}>
+        🄯 Copyleft {new Date().getFullYear()} DE:FI — free software under the{" "}
+        <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" style={{ color: "inherit" }}>GNU AGPL v3</a>.
+        Source:{" "}
+        <a href="https://github.com/5aeidi/radio_on_map_front" target="_blank" rel="noopener noreferrer" style={{ color: "inherit" }}>frontend</a>,{" "}
+        <a href="https://github.com/5aeidi/radio_on_map" target="_blank" rel="noopener noreferrer" style={{ color: "inherit" }}>backend</a>
+      </p>
       <div dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   );
