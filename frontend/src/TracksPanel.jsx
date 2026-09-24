@@ -371,6 +371,23 @@ useEffect(() => {
         </option>
       ))}
     </select>
+    {currentLoc && !(currentLoc.tracks || []).length && (
+      <button
+        style={{ marginLeft: 8, cursor: "pointer" }}
+        onClick={async () => {
+          if (!window.confirm(`Delete empty location "${currentLoc.name}"?`)) return;
+          const res = await authFetch(`/locations/${currentLoc.id}`, { method: "DELETE" });
+          if (!res.ok) {
+            const j = await res.json().catch(() => ({}));
+            return alert(j.detail || "Could not delete location");
+          }
+          setLocations((prev) => prev.filter((l) => l.id !== currentLoc.id));
+          setSelectedLocationId("");
+        }}
+      >
+        Delete location
+      </button>
+    )}
   </label>
 
   {/* Text inputs */}

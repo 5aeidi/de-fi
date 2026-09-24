@@ -60,3 +60,20 @@ async def add_track_to_location(location_id: str, track: TrackInfo):
     for t in loc["tracks"]:
         t["track_id"] = str(t["track_id"])
     return LocationModel(**loc)
+
+
+@router.delete("/{location_id}", dependencies=[Depends(admin_required)])
+async def delete_location(location_id: str):
+    try:
+        loc_obj_id = ObjectId(location_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Location not found.")
+    # only delete when there are no tracks; the filter makes it atomic
+    result = await db.locations.delete_one(
+        {"_id": loc_obj_id, "$or": [{"tracks": {"$exists": False}}, {"tracks": {"$size": 0}}]}
+    )
+    if result.deleted_count == 0:
+        if await db.locations.find_one({"_id": loc_obj_id}, {"_id": 1}):
+            raise HTTPException(status_code=409, detail="Location still has tracks.")
+        raise HTTPException(status_code=404, detail="Location not found.")
+    return {"message": "location deleted"}
