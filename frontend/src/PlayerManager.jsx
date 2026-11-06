@@ -77,6 +77,19 @@ export default function PlayerManager() {
   const [upNextId, setUpNextId] = useState(null);
   const audioRef = useRef(new Audio());
   const queueRef = useRef([]);    // shuffled track ids still to play
+  const loadedIdRef = useRef(null); // track whose file is in the <audio> element
+
+  /* Load + play right away. Called synchronously from the "ended" event and
+     from button clicks: iOS Safari and background tabs refuse a play() that
+     happens later (e.g. after a React re-render). */
+  const load = useCallback((t) => {
+    const a = audioRef.current;
+    a.src = `${API_BASE_URL}${t.file_path}`;
+    loadedIdRef.current = t.track_id;
+    setTime(0);
+    setDuration(0);
+    a.play().catch(() => {});
+  }, []);
 
   /* next id in the shuffle queue (refilled when empty, never the current track) */
   const peekNext = useCallback((currentId) => {
@@ -97,8 +110,10 @@ export default function PlayerManager() {
   const playNext = useCallback(() => {
     const id = peekNext(track?.track_id);
     const next = allTracks.find((t) => t.track_id === id);
-    if (next) start(next);   // keep the current expanded/collapsed state
-  }, [peekNext, track, allTracks, start]);
+    if (!next) return;
+    load(next);              // start audio now, inside the triggering event
+    start(next);             // then update the UI; keeps expanded/collapsed state
+  }, [peekNext, track, allTracks, start, load]);
 
   activateTrack = async (trackId) => {
     let found = allTracks.find((t) => t.track_id === trackId);
@@ -107,7 +122,7 @@ export default function PlayerManager() {
       setLocations(fresh);
       found = fresh.flatMap((l) => l.tracks).find((t) => t.track_id === trackId);
     }
-    if (found) start(found, { expand: true });
+    if (found) { load(found); start(found, { expand: true }); }
     else console.warn("Track not found:", trackId);
   };
 
@@ -142,12 +157,8 @@ export default function PlayerManager() {
 
   useEffect(() => {
     if (!track) return;
-    const a = audioRef.current;
-    a.src = `${API_BASE_URL}${track.file_path}`;
-    setTime(0);
-    setDuration(0);
-    a.play().catch(() => {});
-  }, [track]);
+    if (loadedIdRef.current !== track.track_id) load(track);
+  }, [track, load]);
 
   /* lock-screen / headset controls */
   useEffect(() => {
