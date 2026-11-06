@@ -17,14 +17,15 @@ const ICONS = {
   },
 };
 
-export default function StreamLinks({ links, size = 20 }) {
+export default function StreamLinks({ links, size = 28 }) {
   const entries = Object.entries(links || {}).filter(([p, u]) => ICONS[p] && u);
   if (!entries.length) return null;
   return (
-    <div style={{ display: "flex", gap: 12, margin: "8px 0" }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ display: "flex", gap: 6, margin: "6px 0", flexWrap: "wrap" }} onClick={(e) => e.stopPropagation()}>
       {entries.map(([p, url]) => (
         <a key={p} href={url} target="_blank" rel="noopener noreferrer"
-           title={ICONS[p].label} aria-label={ICONS[p].label} style={{ color: "#fff", lineHeight: 0 }}>
+           title={ICONS[p].label} aria-label={ICONS[p].label}
+           style={{ color: "#fff", lineHeight: 0, minWidth: 44, minHeight: 44, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
           <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d={ICONS[p].path} />
           </svg>

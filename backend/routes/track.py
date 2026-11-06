@@ -2,7 +2,7 @@
 import os, re, uuid, json
 from typing import Optional
 from io import BytesIO
-from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException
+from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException, Request
 from PIL import Image             # pip install pillow
 from bson import ObjectId
 from db import db                 # your motor client
@@ -65,6 +65,7 @@ async def upload_track(
     spotify: str | None = Form(None),
     soundcloud: str | None = Form(None),
     youtube: str | None = Form(None),
+    approximate: bool = Form(False),
     image: UploadFile | None = File(None)
 ):
     # ---------- save MP3 ----------
@@ -95,6 +96,7 @@ async def upload_track(
         "file_path": f"/{audio_path}",
         "image_path": f"/{art_path}" if art_path else None,
         "tags": parse_tags(tags) if tags else [],
+        "approximate": approximate,
         "links": {p: check_link(u) for p, u in zip(LINK_PLATFORMS, (bandcamp, spotify, soundcloud, youtube)) if u and u.strip()},
     }
 
@@ -110,6 +112,7 @@ async def upload_track(
 # ---------- UPDATE track ----------
 @router.put("/locations/{loc_id}/track/{track_id}", dependencies=[Depends(admin_required)])
 async def update_track(
+    request: Request,
     loc_id: str,
     track_id: str,
     title: str | None = Form(None),
@@ -123,9 +126,21 @@ async def update_track(
     spotify: str | None = Form(None),
     soundcloud: str | None = Form(None),
     youtube: str | None = Form(None),
+    approximate: bool | None = Form(None),
     image: UploadFile | None = File(None)
 ):
     loc_oid  = ObjectId(loc_id)
+
+    # FastAPI turns an empty form field into None, so "clear this field" would
+    # look like "field not sent". Read the raw form to tell the two apart.
+    raw = await request.form()
+    def sent_empty(name): return name in raw and raw[name] == ""
+    if hover_info is None and sent_empty("hover_info"): hover_info = ""
+    if info is None and sent_empty("info"): info = ""
+    bandcamp, spotify, soundcloud, youtube = (
+        "" if v is None and sent_empty(p) else v
+        for p, v in zip(LINK_PLATFORMS, (bandcamp, spotify, soundcloud, youtube))
+    )
 
     # build update dict
     changes = {}
@@ -135,6 +150,7 @@ async def update_track(
     if hover_info is not None:  changes["tracks.$.hover_info"] = hover_info
     if info       is not None:  changes["tracks.$.info"] = info
     if tags       is not None:  changes["tracks.$.tags"] = parse_tags(tags)
+    if approximate is not None: changes["tracks.$.approximate"] = approximate
     # links: a sent empty string removes that platform's link
     for plat, url in zip(LINK_PLATFORMS, (bandcamp, spotify, soundcloud, youtube)):
         if url is not None:

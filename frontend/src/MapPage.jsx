@@ -3,16 +3,19 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Map, Marker, Popup, NavigationControl } from "react-map-gl/maplibre";
 import { useSwipeable } from "react-swipeable";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { MAP_STYLE, transformRequest } from "./mapStyle";
+import { MAP_STYLE, transformRequest, MAX_ZOOM, MIN_ZOOM } from "./mapStyle";
 import { getLocations } from "./api";
-import { activateTrack } from "./PlayerManager";
+import { activateTrack, currentLocId } from "./PlayerManager";
 
 /* ---------------- component ---------------- */
 export default function MapPage() {
   /* data */
   const [locations, setLocations] = useState([]);
   const [selectedLoc, setSelectedLoc] = useState(null);
-  const [playingLocId, setPlayingLocId] = useState(null);
+  const [playingLocId, setPlayingLocId] = useState(currentLocId);
+  const mapRef = useRef(null);
+  const locsRef = useRef([]);
+  locsRef.current = locations;
   
   const isMobile = window.matchMedia("(max-width:600px)").matches;
 
@@ -28,7 +31,13 @@ export default function MapPage() {
     });
       }, []);
       useEffect(() => {
-        const handler = (e) => setPlayingLocId(e.detail);
+        const handler = (e) => {
+          setPlayingLocId(e.detail);
+          // glide to the new track's location (e.g. when shuffle moves on)
+          const loc = locsRef.current.find((l) => l.id === e.detail);
+          const map = mapRef.current;
+          if (loc && map) map.flyTo({ center: [+loc.longitude, +loc.latitude], zoom: Math.max(map.getZoom(), 2.5), duration: 2000 });
+        };
         window.addEventListener("tracklocationchange", handler);
         return () => window.removeEventListener("tracklocationchange", handler);
       }, []);
@@ -50,9 +59,12 @@ export default function MapPage() {
     <>
       {/* ------------- MAP ------------- */}
       <Map
+        ref={mapRef}
+        maxZoom={MAX_ZOOM}
+        minZoom={MIN_ZOOM}
         initialViewState={{ latitude: 0, longitude: 0, zoom: 1.5 }}
         onClick={() => setSelectedLoc(null)} 
-        style={{ width: "100vw", height: "100vh" }}
+        style={{ width: "100%", height: "100vh" }}
         mapStyle={MAP_STYLE}
         transformRequest={transformRequest}
       >
@@ -102,14 +114,20 @@ export default function MapPage() {
               selectedLoc.tracks.map((t) => (
                 <div
                   key={t.track_id}
-                  style={{ cursor: "pointer", margin: "4px 0" }}
+                  title={t.hover_info || undefined}
+                  style={{ cursor: "pointer", margin: "6px 0" }}
                   onClick={() => {
                     activateTrack(t.track_id);
-                    console.log('t',selectedLoc.name);
                     setSelectedLoc(null);
                   }}
                 >
                   {t.artist} — {t.title} ({t.year})
+                  {t.hover_info && <div className="popup-hover">{t.hover_info}</div>}
+                  {(t.tags || []).length > 0 && (
+                    <div className="track-tags">
+                      {t.tags.map((tag) => <span key={tag}>#{tag}</span>)}
+                    </div>
+                  )}
                 </div>
               ))
             ) : (

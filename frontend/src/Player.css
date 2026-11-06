@@ -1,0 +1,199 @@
+/* Global player: collapsed bar + expanded pane (desktop) / bottom sheet (phone). */
+
+/* ---------- collapsed bar ---------- */
+.player-bar {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 340px;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 6px;
+  box-sizing: border-box;
+  background: #111;
+  border: 1px solid #fff;
+  color: #fff;
+  cursor: pointer;
+  overflow: visible;
+}
+.player-bar-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  background: #ff0;
+  pointer-events: none;
+}
+.player-bar-art {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  object-fit: cover;
+  border: 1px solid #fff;
+  box-sizing: border-box;
+  background: #222;
+}
+.player-bar-text { flex: 1 1 auto; min-width: 0; }
+.player-bar-title,
+.player-bar-sub .ellip {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player-bar-title { font-size: 10px; margin-bottom: 4px; }
+.player-bar-sub   { font-size: 8px; color: #bbb; display: flex; align-items: center; min-width: 0; }
+.player-bar-sub .ellip { min-width: 0; }
+.player-bar-btn {
+  flex: 0 0 40px;
+  height: 40px;
+  border: 1px solid #fff;
+  background: #000;
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ---------- expanded pane (desktop: right side) ---------- */
+.player-pane {
+  position: fixed;
+  top: 76px;
+  right: 1px;
+  width: 300px;
+  max-height: calc(100vh - 96px);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+  box-sizing: border-box;
+  background: #000;
+  color: #fff;
+  border: 1px solid #fff;
+  overflow-y: auto;
+  transform: translateX(110%);
+  transition: transform .25s ease-out;
+  visibility: hidden;
+}
+.player-pane.open { transform: translateX(0); visibility: visible; }
+
+.player-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.player-head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.player-head-text { min-width: 0; padding-right: 28px; }
+.player-art {
+  width: 200px;
+  height: 200px;
+  align-self: center;
+  object-fit: cover;
+  border: 1px solid #fff;
+  order: 2;
+}
+.player-title { margin: 0 0 6px; font-size: 14px; line-height: 1.4; }
+.player-sub   { margin: 0 0 4px; font-size: 10px; display: flex; align-items: center; flex-wrap: wrap; }
+
+.player-controls { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.player-controls button { padding: 6px 8px; font-size: 10px; cursor: pointer; }
+
+.track-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; }
+.track-tags span { font-size: 9px; border: 1px solid #fff; padding: 2px 4px; }
+.sor-popup .popup-hover {
+  font-size: 8px;
+  color: #aaa;
+  margin-top: 2px;
+  padding: 0 !important;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sor-popup .track-tags { margin-top: 4px; padding: 0 !important; }
+.sor-popup .track-tags span { font-size: 7px; padding: 1px 3px; }
+
+.player-note   { font-size: 9px; line-height: 1.6; margin: 6px 0; overflow-wrap: anywhere; }
+.player-upnext { font-size: 9px; color: #ff0; line-height: 1.6; margin: 8px 0; }
+
+/* ---------- ⓘ approximate-location marker ---------- */
+.approx { position: relative; display: inline-flex; margin-left: 6px; flex: 0 0 auto; }
+.approx-btn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid #ff0;
+  border-radius: 50%;
+  background: #000;
+  color: #ff0;
+  font-size: 9px;
+  line-height: 14px;
+  font-family: Georgia, serif;
+  font-style: italic;
+  cursor: help;
+}
+.approx-tip {
+  position: absolute;
+  left: -60px;
+  bottom: calc(100% + 6px);
+  width: 150px;
+  white-space: normal;
+  line-height: 1.5;
+  background: #111;
+  border: 1px solid #ff0;
+  color: #ff0;
+  font-size: 8px;
+  padding: 4px 6px;
+  z-index: 1200;
+}
+
+.player-pane .approx-tip { bottom: auto; top: calc(100% + 6px); }
+
+/* ---------- phones ---------- */
+@media (max-width: 600px) {
+  .player-bar {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  }
+
+  .player-pane {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: 45vh;
+    padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    transform: translateY(110%);
+  }
+  .player-pane.open { transform: translateY(0); }
+
+  /* art beside the text instead of above it */
+  .player-head { flex-direction: row; align-items: flex-start; }
+  .player-art { width: 72px; height: 72px; flex: 0 0 72px; order: 0; align-self: flex-start; }
+  .player-title { font-size: 11px; }
+  .player-sub   { font-size: 9px; }
+
+  /* keep map controls above the player bar */
+  .maplibregl-ctrl-bottom-left,
+  .maplibregl-ctrl-bottom-right { bottom: 58px; }
+}

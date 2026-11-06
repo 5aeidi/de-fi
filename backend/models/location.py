@@ -12,6 +12,7 @@ class TrackInfo(BaseModel):
     image_path: Optional[str] = None
     tags: List[str] = []            # optional: absent on older tracks
     links: Dict[str, str] = {}      # platform -> URL, optional
+    approximate: bool = False       # location is only roughly right
 
 class LocationModel(BaseModel):
     id: Optional[str] = Field(default='str', alias="_id")

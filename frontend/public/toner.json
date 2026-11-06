@@ -38,6 +38,7 @@
       "type": "line",
       "source": "osm",
       "source-layer": "transportation",
+      "filter": ["!=", ["get", "class"], "ferry"],
       "paint": { "line-color": "#333", "line-width": 0.7 }
     },
 
@@ -46,6 +47,12 @@
       "type": "symbol",
       "source": "osm",
       "source-layer": "place",
+      "filter": [
+        "any",
+        ["in", ["get", "class"], ["literal", ["continent", "country"]]],
+        ["all", ["==", ["get", "class"], "state"], ["<=", ["coalesce", ["get", "rank"], 99], 3]],
+        ["all", ["==", ["get", "class"], "city"], ["<=", ["coalesce", ["get", "rank"], 99], 4]]
+      ],
       "layout": {
         "text-field": [
           "case",

@@ -13,3 +13,8 @@ export function transformRequest(url) {
   }
   return { url };
 }
+
+// Keep the map at country / region level: labels stop at states and big
+// cities (see toner.json), and nobody needs street-level precision to place a track.
+export const MAX_ZOOM = 6;
+export const MIN_ZOOM = 1;

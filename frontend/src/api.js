@@ -51,7 +51,7 @@ export async function authFetch(path, opts = {}) {
 }
 
 export async function getPosts(skip = 0, limit =10) {
-  const r = await fetch(`${API_BASE_URL}/posts?skip=${skip}&limit=${limit}`);
+  const r = await fetch(`${API_BASE_URL}/posts/?skip=${skip}&limit=${limit}`);
   return r.json();
 }
 

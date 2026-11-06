@@ -1,7 +1,7 @@
 import React from "react";
 import { Map, NavigationControl } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { MAP_STYLE, transformRequest } from "./mapStyle";
+import { MAP_STYLE, transformRequest, MAX_ZOOM, MIN_ZOOM } from "./mapStyle";
 const isMobile = window.matchMedia("(max-width:600px)").matches;
 
 /**
@@ -21,6 +21,8 @@ export default function MapView({
 }) {
   return (
     <Map
+      maxZoom={MAX_ZOOM}
+      minZoom={MIN_ZOOM}
       initialViewState={initial}
       mapStyle={MAP_STYLE}
       transformRequest={transformRequest}

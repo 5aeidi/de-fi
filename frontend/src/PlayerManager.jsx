@@ -1,234 +1,274 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+// Global audio player: one <audio> for the whole site, mounted outside the router.
+// - activateTrack(id) plays a chosen track (map popup, blog links).
+// - When a track ends, a random next track plays (shuffle without repeats until
+//   every track has played), so the site keeps playing on its own.
+// - The player is either expanded (side pane / bottom sheet) or collapsed to a
+//   small bar; the ✕ collapses it and tapping the bar expands it again.
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useSwipeable } from "react-swipeable";
 import { getLocations, getPosts, API_BASE_URL } from "./api";
 import StreamLinks from "./StreamLinks";
+import "./Player.css";
 
-const HEADER_H = 56;               // same as your header height
-const isMobile = window.matchMedia("(max-width:600px)").matches;
-console.log('inplayerismobile', isMobile);
-export let activateTrack = () => {}; // will be overwritten
+export let activateTrack = () => {}; // overwritten by PlayerManager
+export let currentLocId = null;      // location of the playing track, for pages mounted later
+
+const normalise = (data) =>
+  data.map((l) => {
+    const id = String(l.id || l._id);
+    return { ...l, id, tracks: (l.tracks || []).map((t) => ({ ...t, loc: { id, name: l.name, latitude: l.latitude, longitude: l.longitude } })) };
+  });
+
+const shuffle = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+const fmt = (s) =>
+  `${String(Math.floor((s || 0) / 60)).padStart(2, "0")}:${String(Math.floor((s || 0) % 60)).padStart(2, "0")}`;
+
+/* ⓘ shown when the track's map position is only roughly right.
+   Hover shows the native tooltip; tap (phones) toggles the text. */
+function ApproxInfo() {
+  const [open, setOpen] = useState(false);
+  const text = "Location is approximate";
+  return (
+    <span className="approx">
+      <button
+        type="button"
+        className="approx-btn"
+        title={text}
+        aria-label={text}
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+        onBlur={() => setOpen(false)}
+      >
+        i
+      </button>
+      {open && <span className="approx-tip" role="tooltip">{text}</span>}
+    </span>
+  );
+}
 
 export default function PlayerManager() {
-  /* ---------- load everything once ---------- */
+  /* ---------- data ---------- */
   const [locations, setLocations] = useState([]);
   const [posts, setPosts] = useState([]);
-  useEffect(() => { getLocations().then(setLocations); getPosts().then(setPosts); }, []);
-useEffect(() => {
-    getLocations().then((data) => {
-    const normalised = data.map((l) => ({
-        ...l,
-        id: String(l.id || l._id),              // ← always a plain string
-        tracks: l.tracks.map((t) => ({         //   and each track’s parent id
-        ...t,
-        parentLocId: String(l.id || l._id),
-        })),
-    }));
-    setLocations(normalised);
-    });
-}, []);
-  
-  /* ---------- audio & player state ---------- */
+  const reload = useCallback(() => getLocations().then((d) => setLocations(normalise(d))).catch(() => {}), []);
+  useEffect(() => {
+    reload();
+    getPosts().then((p) => setPosts(Array.isArray(p) ? p : [])).catch(() => {});
+    // admin edits in this tab dispatch this so the player isn't stale
+    window.addEventListener("tracksupdated", reload);
+    return () => window.removeEventListener("tracksupdated", reload);
+  }, [reload]);
+
+  const allTracks = useMemo(() => locations.flatMap((l) => l.tracks), [locations]);
+
+  /* ---------- player state ---------- */
   const [track, setTrack]       = useState(null);
-  const [showPane, setShowPane] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [playing, setPlaying]   = useState(false);
   const [time, setTime]         = useState(0);
   const [duration, setDuration] = useState(0);
+  const [upNextId, setUpNextId] = useState(null);
   const audioRef = useRef(new Audio());
+  const queueRef = useRef([]);    // shuffled track ids still to play
 
-activateTrack = async (trackId) => {
-    console.log("activateTrack called with", trackId);   // <- TEMP
+  /* next id in the shuffle queue (refilled when empty, never the current track) */
+  const peekNext = useCallback((currentId) => {
+    const ids = allTracks.map((t) => t.track_id);
+    queueRef.current = queueRef.current.filter((id) => id !== currentId && ids.includes(id));
+    if (!queueRef.current.length) queueRef.current = shuffle(ids.filter((id) => id !== currentId));
+    return queueRef.current[0] || null;
+  }, [allTracks]);
 
-    // helper to search the local copy
-    const find = (locs) =>
-      locs.flatMap((l) => l.tracks.map((t) => ({ ...t, loc: l })))
-          .find((t) => t.track_id === trackId);
-  
-    let found = find(locations);
-    console.log('found',found);
-    // if not loaded yet, fetch locations once
+  const start = useCallback((t, { expand } = {}) => {
+    queueRef.current = queueRef.current.filter((id) => id !== t.track_id);
+    setTrack(t);
+    if (expand !== undefined) setExpanded(expand);
+    currentLocId = t.loc.id;
+    window.dispatchEvent(new CustomEvent("tracklocationchange", { detail: t.loc.id }));
+  }, []);
+
+  const playNext = useCallback(() => {
+    const id = peekNext(track?.track_id);
+    const next = allTracks.find((t) => t.track_id === id);
+    if (next) start(next);   // keep the current expanded/collapsed state
+  }, [peekNext, track, allTracks, start]);
+
+  activateTrack = async (trackId) => {
+    let found = allTracks.find((t) => t.track_id === trackId);
     if (!found) {
-      const fresh = await getLocations();
-      setLocations(fresh);            // keeps UI in sync next time
-      found = find(fresh);
+      const fresh = normalise(await getLocations());
+      setLocations(fresh);
+      found = fresh.flatMap((l) => l.tracks).find((t) => t.track_id === trackId);
     }
-  
-    if (found) {
-        console.log('found', found);
-      setTrack(found);                // start playback
-      setShowPane(true);
-      const locId = String(found.loc.id || found.loc._id);   // ← force to string
-      window.dispatchEvent(new CustomEvent("tracklocationchange", { detail: locId }));
-    } else {
-      console.warn("Track not found:", trackId);
-    }
+    if (found) start(found, { expand: true });
+    else console.warn("Track not found:", trackId);
   };
-  /* runs once: keep <playing> flag in sync with real audio state */
-    useEffect(() => {
-        const a = audioRef.current;
-        const onPlay  = () => setPlaying(true);
-        const onPause = () => setPlaying(false);
-        a.addEventListener("play",  onPlay);
-        a.addEventListener("pause", onPause);
-        return () => {
-        a.removeEventListener("play",  onPlay);
-        a.removeEventListener("pause", onPause);
-        };
-    }, []);
 
-  /* ---------- audio side-effects ---------- */
+  /* "Up next" label follows the current track and the queue */
+  useEffect(() => { if (track) setUpNextId(peekNext(track.track_id)); }, [track, peekNext]);
+  const upNext = allTracks.find((t) => t.track_id === upNextId);
+
+  /* ---------- audio ---------- */
+  const playNextRef = useRef(playNext);
+  playNextRef.current = playNext;
+
+  useEffect(() => {
+    const a = audioRef.current;
+    const onPlay  = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    const onTime  = () => setTime(a.currentTime);
+    const onMeta  = () => setDuration(a.duration);
+    const onEnded = () => playNextRef.current();
+    a.addEventListener("play", onPlay);
+    a.addEventListener("pause", onPause);
+    a.addEventListener("timeupdate", onTime);
+    a.addEventListener("loadedmetadata", onMeta);
+    a.addEventListener("ended", onEnded);
+    return () => {
+      a.removeEventListener("play", onPlay);
+      a.removeEventListener("pause", onPause);
+      a.removeEventListener("timeupdate", onTime);
+      a.removeEventListener("loadedmetadata", onMeta);
+      a.removeEventListener("ended", onEnded);
+    };
+  }, []);
+
   useEffect(() => {
     if (!track) return;
     const a = audioRef.current;
     a.src = `${API_BASE_URL}${track.file_path}`;
+    setTime(0);
+    setDuration(0);
     a.play().catch(() => {});
-    setPlaying(true);
-
-    const up  = () => setTime(a.currentTime);
-    const md  = () => setDuration(a.duration);
-    const end = () => {
-        setPlaying(false);
-        window.dispatchEvent(new CustomEvent("tracklocationchange", { detail: null }));
-      };
-
-    a.addEventListener("timeupdate", up);
-    a.addEventListener("loadedmetadata", md);
-    a.addEventListener("ended", end);
-    return () => {
-      a.removeEventListener("timeupdate", up);
-      a.removeEventListener("loadedmetadata", md);
-      a.removeEventListener("ended", end);
-    };
   }, [track]);
 
-  /* ---------- helper fns ---------- */
-  const toggle = () => {
+  /* lock-screen / headset controls */
+  useEffect(() => {
+    if (!track || !("mediaSession" in navigator)) return;
+    const art = track.image_path ? [{ src: `${API_BASE_URL}${track.image_path}`, sizes: "300x300", type: "image/jpeg" }] : [];
+    navigator.mediaSession.metadata = new window.MediaMetadata({
+      title: track.title, artist: track.artist || "", album: track.loc.name, artwork: art,
+    });
     const a = audioRef.current;
-    if (a.paused) {
-      a.play();
-      setPlaying(true);
-    } else {
-      a.pause();
-      setPlaying(false);
-    }
+    const set = (action, fn) => { try { navigator.mediaSession.setActionHandler(action, fn); } catch {} };
+    set("play", () => a.play());
+    set("pause", () => a.pause());
+    set("nexttrack", () => playNextRef.current());
+  }, [track]);
+
+  const toggle = (e) => {
+    e?.stopPropagation();
+    const a = audioRef.current;
+    if (a.paused) a.play().catch(() => {}); else a.pause();
   };
-  const seek   = (v) => (audioRef.current.currentTime = v);
-  const skip   = (d) => (audioRef.current.currentTime += d);
+  const seek = (v) => (audioRef.current.currentTime = v);
+  const skip = (d) => (audioRef.current.currentTime += d);
+  const next = (e) => { e?.stopPropagation(); playNext(); };
 
-  /* ---------- UI (mini-box + pane) ---------- */
-  const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  /* swipe right (desktop pane) or down (phone sheet, when scrolled to top) collapses */
+  const paneRef = useRef(null);
+  const swipe = useSwipeable({
+    onSwipedRight: () => setExpanded(false),
+    onSwipedDown: () => { if (!paneRef.current || paneRef.current.scrollTop <= 0) setExpanded(false); },
+    trackMouse: false,
+  });
+  const setPaneRef = (el) => { paneRef.current = el; swipe.ref(el); };
 
-  const swipe = useSwipeable({ onSwipedRight: () => setShowPane(false), trackMouse: true });
+  if (!track) return null;
 
-  const postRefs = track ? posts.filter((p) => p.track_ids.includes(track.track_id)) : [];
+  const postRefs = posts.filter((p) => (p.track_ids || []).includes(track.track_id));
+  const art = track.image_path ? `${API_BASE_URL}${track.image_path}` : null;
+  const tags = track.tags || [];
+  const progress = duration ? (time / duration) * 100 : 0;
 
   return (
     <>
-      {/* mini box */}
-      {track && !showPane && (
-            <div
-            className="mini-box"
-            onClick={() => setShowPane(true)}
-            style={{
-                background:"#111", border:"1px solid #fff",
-                padding:12, zIndex:1100, cursor:"pointer",
-                width:260, color:"#fff", fontFamily:"inherit",
-            }}
-            >
-          <strong>{track.title}</strong><br/>
-          <small>{track.artist} &middot; {track.year}</small>
-          <StreamLinks links={track.links} size={16} />
-          <input type="range" min={0} max={duration||0} value={time} onChange={(e)=>seek(+e.target.value)} style={{ width: "100%", marginTop: 4 }} />
-          <small>{fmt(time)} / {fmt(duration)}</small><br/>
-          <button onClick={(e)=>{e.stopPropagation();toggle();}} style={{ marginTop:4 }}> {playing?"Pause":"Play"} </button>
+      {/* ---------- collapsed bar ---------- */}
+      {!expanded && (
+        <div
+          className="player-bar"
+          role="button"
+          tabIndex={0}
+          aria-label="Open player"
+          onClick={() => setExpanded(true)}
+          onKeyDown={(e) => { if (e.key === "Enter") setExpanded(true); }}
+        >
+          <div className="player-bar-progress" style={{ width: `${progress}%` }} />
+          {art ? <img src={art} alt="" className="player-bar-art" /> : <div className="player-bar-art" />}
+          <div className="player-bar-text">
+            <div className="player-bar-title">{track.title}</div>
+            <div className="player-bar-sub">
+              <span className="ellip">{track.artist}{track.loc.name ? ` · ${track.loc.name}` : ""}</span>
+              {track.approximate && <ApproxInfo />}
+            </div>
+          </div>
+          <button type="button" className="player-bar-btn" onClick={toggle} aria-label={playing ? "Pause" : "Play"}>
+            {playing ? "❚❚" : "▶"}
+          </button>
+          <button type="button" className="player-bar-btn" onClick={next} aria-label="Next track">▶▶</button>
         </div>
       )}
 
-      {/* side pane */}
-      <div
-  {...swipe}
-  className="player-pane"
-  style={{
-    position: "fixed",
+      {/* ---------- expanded pane / bottom sheet ---------- */}
+      <div {...swipe} ref={setPaneRef} className={`player-pane${expanded ? " open" : ""}`} aria-hidden={!expanded}>
+        <button type="button" className="player-close" onClick={() => setExpanded(false)} aria-label="Minimise player">×</button>
 
-    /* ---- position ------------------------------------------------------ */
-    top:    isMobile ? "auto"     : HEADER_H+20,
-    bottom: isMobile ? 0          : "auto",
-    left:   isMobile ? "50%"      : "auto",
-    right:  isMobile ? "auto"     : 1,
+        <div className="player-head">
+          {art && <img src={art} alt="art" className="player-art" />}
+          <div className="player-head-text">
+            <h2 className="player-title">{track.title}</h2>
+            <p className="player-sub">{track.artist}{track.year ? ` · ${track.year}` : ""}</p>
+            <p className="player-sub">
+              {track.loc.name}
+              {track.approximate && <ApproxInfo />}
+            </p>
+          </div>
+        </div>
 
-    /* ---- size ---------------------------------------------------------- */
-    width:  isMobile ? "90vw"     : 300,
-    height: isMobile ? "60vh"     : `calc(100vh - ${HEADER_H}px)`,
+        <input type="range" min={0} max={duration || 0} value={time} onChange={(e) => seek(+e.target.value)} />
+        <small>{fmt(time)} / {fmt(duration)}</small>
 
-    /* ---- border -------------------------------------------------------- */
-    borderLeft: isMobile ? "none"           : "1px solid #fff",
-    borderTop:  isMobile ? "1px solid #fff" : "none",
-    borderRight: isMobile ? "none"           : "1px solid #fff",
+        <div className="player-controls">
+          <button type="button" onClick={() => skip(-10)}>-10s</button>
+          <button type="button" onClick={toggle}>{playing ? "Pause" : "Play"}</button>
+          <button type="button" onClick={() => skip(10)}>+10s</button>
+          <button type="button" onClick={next} aria-label="Next track">Next</button>
+        </div>
 
-    /* ---- slide-in transform ------------------------------------------- */
-    transform: showPane
-      ? isMobile
-          ? "translate(-50%, 0)"            // centered & visible
-          : "translateX(0)"
-      : isMobile
-          ? "translate(-50%, 100%)"         // slide down off-screen
-          : "translateX(100%)",
+        <StreamLinks links={track.links} />
 
-    transition: "transform .25s ease-out",
+        {tags.length > 0 && (
+          <div className="track-tags">
+            {tags.map((t) => <span key={t}>#{t}</span>)}
+          </div>
+        )}
+        {track.hover_info && <p className="player-note">{track.hover_info}</p>}
+        {track.info && <p className="player-note">{track.info}</p>}
 
-    /* ---- misc ---------------------------------------------------------- */
-    zIndex: 1000,
-    background: "#000",
-    display: track ? "flex" : "none",
-    flexDirection: "column",
-    padding: 18,
-    boxSizing: "border-box",
-    color: "#fff",
-    fontFamily: "inherit",
-    overflowY: "auto",
-  }}
->
+        {upNext && (
+          <p className="player-upnext">
+            Up next: {upNext.artist ? `${upNext.artist} — ` : ""}{upNext.title} ({upNext.loc.name})
+          </p>
+        )}
 
-
-        <button onClick={()=>setShowPane(false)} style={{ alignSelf:"flex-end", background:"none", border:"none", color:"#fff", fontSize:18 }}>×</button>
-        {track && (
-          <>
-            <h2 style={{margin:"0px 0", fontSize:16}}>{track.title}</h2>
-            <p style={{margin:"0 0 6px 0", fontSize:12}}>{track.artist} &middot; {track.year}</p>
-            {track.image_path && <img src={`${API_BASE_URL}${track.image_path}`} width={200} height={200} style={{ alignSelf:"center", objectFit:"cover", border:"1px solid #fff", marginBottom:12 }} alt="art" />}
-            
-
-            <input type="range" min={0} max={duration||0} value={time} onChange={(e)=>seek(+e.target.value)} />
-            <small>{fmt(time)} / {fmt(duration)}</small>
-
-            <div style={{ marginTop:8 }}>
-              <button onClick={()=>skip(-10)}>-10s</button>
-              <button onClick={toggle} style={{ margin:"0 6px" }}>{playing?"Pause":"Play"}</button>
-              <button onClick={()=>skip(10)}>+10s</button>
-            </div>
-            <StreamLinks links={track.links} />
-            {(track.tags || []).length > 0 && (
-              <div style={{ display:"flex", flexWrap:"wrap", gap:4, margin:"4px 0" }}>
-                {track.tags.map((t) => (
-                  <span key={t} style={{ fontSize:10, border:"1px solid #fff", padding:"0 4px" }}>#{t}</span>
-                ))}
+        {postRefs.length > 0 && (
+          <div style={{ marginTop: "auto" }}>
+            <small>Featured in:</small>
+            {postRefs.map((p) => (
+              <div key={p.post_id}>
+                <a href={`/blog/${p.post_id}`} style={{ fontSize: 10, color: "#0af" }}>{p.title}</a>
               </div>
-            )}
-            {track.info && <p style={{fontSize:10, marginBottom:12}}>{track.info}</p>}
-            {postRefs.length>0 && (
-              <div style={{ marginTop:"auto" }}>
-                <small>Featured in:</small>
-                {postRefs.map((p)=>
-                  <div key={p.post_id}>
-                    <a href={`/blog/${p.post_id}`} style={{fontSize:10, color:"#0af"}}>{p.title}</a>
-                  </div>
-                )}
-              </div>
-            )}
-          </>
+            ))}
+          </div>
         )}
       </div>
-      
     </>
   );
 }

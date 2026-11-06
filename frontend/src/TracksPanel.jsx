@@ -7,8 +7,22 @@ import {
   NavigationControl,
 } from "react-map-gl/maplibre";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { MAP_STYLE, transformRequest, MAPTILER_KEY } from "./mapStyle";
+import { MAP_STYLE, transformRequest, MAPTILER_KEY, MAX_ZOOM, MIN_ZOOM } from "./mapStyle";
 import "./Admin.css";
+
+// Hashtags typed into a text field instead of the tag box: offer to move them.
+// Returns [text, tags] with the hashtags moved when the admin agrees.
+const HASHTAG = /#([\p{L}\p{N}_-]+)/gu;
+function moveHashtags(fieldName, text, tags) {
+  const found = [...(text || "").matchAll(HASHTAG)].map((m) => m[1]);
+  const fresh = found.filter((t) => !tags.some((v) => v.toLowerCase() === t.toLowerCase()));
+  if (!fresh.length) return [text, tags];
+  if (!window.confirm(`${fieldName} contains hashtags (${fresh.map((t) => "#" + t).join(" ")}).\nMove them into Tags?`)) {
+    return [text, tags];
+  }
+  const rest = text.replace(HASHTAG, "").replace(/\s{2,}/g, " ").trim();
+  return [rest, [...tags, ...fresh]];
+}
 
 const LINK_PLATFORMS = [
   ["bandcamp", "Bandcamp"],
@@ -38,6 +52,7 @@ export default function TracksPanel({ token }) {
   const [links, setLinks] = useState({});         // platform -> url (optional)
   const [allTags, setAllTags] = useState([]);
   const [editTags, setEditTags] = useState([]);
+  const [approximate, setApproximate] = useState(false);
 
   /* location search (MapTiler geocoding) */
   const mapRef = useRef(null);
@@ -74,16 +89,20 @@ export default function TracksPanel({ token }) {
     const handleUpload = async () => {
       if (!selectedLocationId) return alert("Select a location first");
       if (!file) return alert("Choose an MP3 file");
+      let hover = hoverInfo, info = infoTxt, tagList = tags;
+      [info, tagList]  = moveHashtags("Extra info", info, tagList);
+      [hover, tagList] = moveHashtags("Hover info", hover, tagList);
       const form = new FormData();
       form.append("file", file);
       form.append("title", trackTitle);
       form.append("location_id", selectedLocationId);
       form.append("artist", artist);
       form.append("year", year);
-      if (hoverInfo) form.append("hover_info", hoverInfo);
-      if (infoTxt)   form.append("info", infoTxt);
+      if (hover) form.append("hover_info", hover);
+      if (info)  form.append("info", info);
       if (artFile) form.append("image", artFile);
-      if (tags.length) form.append("tags", JSON.stringify(tags));
+      if (tagList.length) form.append("tags", JSON.stringify(tagList));
+      form.append("approximate", approximate ? "true" : "false");
       LINK_PLATFORMS.forEach(([p]) => {
         if (links[p]?.trim()) form.append(p, links[p].trim());
       });
@@ -104,8 +123,11 @@ export default function TracksPanel({ token }) {
       setTrackTitle("");
       setHoverInfo("");
       setFile(null);
+      setInfoTxt("");
       setTags([]);
       setLinks({});
+      setApproximate(false);
+      window.dispatchEvent(new Event("tracksupdated"));
       alert("Uploaded");
     };
   
@@ -165,7 +187,7 @@ const pickPlace = (f) => {
   setCreateLng(lng.toFixed(6));
   setGeoResults([]);
   setGeoQuery(f.place_name);
-  mapRef.current?.flyTo({ center: [lng, lat], zoom: 9 });
+  mapRef.current?.flyTo({ center: [lng, lat], zoom: MAX_ZOOM });
 };
 
 useEffect(() => {
@@ -235,6 +257,8 @@ useEffect(() => {
         {/* Same MapLibre map as MapPage, but shorter height */}
         <Map
           ref={mapRef}
+          maxZoom={MAX_ZOOM}
+          minZoom={MIN_ZOOM}
           initialViewState={{ latitude: 0, longitude: 0, zoom: 1.5 }}
           style={{ height: 240, width: "100%", border: "1px solid #fff" }}
           mapStyle={MAP_STYLE}
@@ -444,6 +468,16 @@ useEffect(() => {
       <TagInput value={tags} onChange={setTags} allTags={allTags} disabled={!selectedLocationId} />
     </label>
 
+    <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <input
+        type="checkbox"
+        checked={approximate}
+        onChange={(e) => setApproximate(e.target.checked)}
+        disabled={!selectedLocationId}
+      />
+      Location is approximate (not the exact place)
+    </label>
+
     {LINK_PLATFORMS.map(([p, label]) => (
       <label key={p}>
         {label} link (optional):<br />
@@ -529,6 +563,11 @@ useEffect(() => {
       <TagInput value={editTags} onChange={setEditTags} allTags={allTags} />
     </div>
 
+    <label style={{ display: "flex", alignItems: "center", gap: 6, margin: "6px 0" }}>
+      <input type="checkbox" id="edt-approx" defaultChecked={!!editingTrack.approximate} />
+      Location is approximate
+    </label>
+
     {/* streaming links: clear a field to remove that link */}
     {LINK_PLATFORMS.map(([p, label]) => (
       <React.Fragment key={p}>
@@ -560,8 +599,12 @@ useEffect(() => {
         const titleVal  = document.getElementById("edt-title").value;
         const artistVal = document.getElementById("edt-artist").value;
         const yearVal   = Number(document.getElementById("edt-year").value);
-        const hoverVal  = document.getElementById("edt-hover").value;
-        const infoVal   = document.getElementById("edt-info").value;
+        let hoverVal    = document.getElementById("edt-hover").value;
+        let infoVal     = document.getElementById("edt-info").value;
+        const approxVal = document.getElementById("edt-approx").checked;
+        let newTags = editTags;
+        [infoVal, newTags]  = moveHashtags("Extra info", infoVal, newTags);
+        [hoverVal, newTags] = moveHashtags("Hover info", hoverVal, newTags);
 
         if (titleVal  !== editingTrack.title)   form.append("title",  titleVal);
         if (artistVal !== editingTrack.artist)  form.append("artist", artistVal);
@@ -570,8 +613,9 @@ useEffect(() => {
         if (infoVal   !== (editingTrack.info || ""))       form.append("info",       infoVal);
 
         const oldTags = editingTrack.tags || [];
-        const tagsChanged = JSON.stringify(editTags) !== JSON.stringify(oldTags);
-        if (tagsChanged) form.append("tags", JSON.stringify(editTags));
+        const tagsChanged = JSON.stringify(newTags) !== JSON.stringify(oldTags);
+        if (tagsChanged) form.append("tags", JSON.stringify(newTags));
+        if (approxVal !== !!editingTrack.approximate) form.append("approximate", approxVal ? "true" : "false");
         const newLinks = { ...(editingTrack.links || {}) };
         LINK_PLATFORMS.forEach(([p]) => {
           const v = document.getElementById(`edt-link-${p}`).value.trim();
@@ -586,7 +630,6 @@ useEffect(() => {
         const imgFile = document.getElementById("edt-img").files[0];
         if (audFile) form.append("file",  audFile);
         if (imgFile) form.append("image", imgFile);
-        console.log('FORM: ', form);
         /* send PUT */
         const res = await authFetch(
           `/tracks/locations/${selectedLocationId}/track/${editingTrack.track_id}`,
@@ -597,12 +640,7 @@ useEffect(() => {
           return alert(err.detail || `Save failed (${res.status})`);
         }
         if (tagsChanged) getTags().then(setAllTags);
-        {currentLoc && (
-            <p style={{ marginTop:4, fontSize:12 }}>
-              Selected: {currentLoc.name} ({currentLoc.latitude.toFixed(2)}, {currentLoc.longitude.toFixed(2)})
-            </p>
-          )}
-          
+        window.dispatchEvent(new Event("tracksupdated"));
         /* update local state so UI refreshes */
         setLocations(prev =>
           prev.map(loc =>
@@ -618,8 +656,9 @@ useEffect(() => {
                           year:       yearVal,
                           hover_info: hoverVal || null,
                           info:       infoVal   || null,
-                          tags:       editTags,
-                          links:      newLinks,
+                          tags:        newTags,
+                          links:       newLinks,
+                          approximate: approxVal,
                         }
                       : tr
                   ),

@@ -40,7 +40,11 @@ export default function TagInput({ value, onChange, allTags, disabled }) {
         disabled={disabled}
         onChange={(e) => { setText(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onBlur={() => {
+          // commit half-typed text so it isn't lost when the form is saved
+          if (text.trim()) add(text);
+          setTimeout(() => setOpen(false), 150);
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(text); }
           else if (e.key === "Backspace" && !text && value.length) remove(value[value.length - 1]);
